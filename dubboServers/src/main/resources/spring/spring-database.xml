@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:p="http://www.springframework.org/schema/p"
+    xsi:schemaLocation = "
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/tx 
+		http://www.springframework.org/schema/tx/spring-tx-4.1.xsd
+		http://www.springframework.org/schema/aop 
+		http://www.springframework.org/schema/aop/spring-aop-4.1.xsd">
+        
+       
+       <!-- 完成数据的加密后然后进行配置  由于使用了数据库加密不能使用property-placeHolder 阅读器了
+              <context:property-placeholder location=""/>
+        -->
+<!--
+         <context:property-placeholder location="WEB-INF/spring/database.properties"/>
+-->
+       
+       <!--引入我们访问数据库的及密码类-->
+        <bean class="com.wsbg.common.EncryptPropertyPlaceholderConfigurer"   p:location="classpath:prop/database.properties"/>
+        
+        <!-- 配置数据源 -->
+       <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+                                <property name="username" value="${db.user}"/>
+                                <property name="password" value="${db.password}"/>
+                                <property name="url" value="${db.url}"/>
+                                <property name="driverClassName" value="${db.driver}"/>
+                                <property name="maxActive" value="${db.maxActive}" />
+        						<property name="maxIdle" value ="${db.maxIdle}" />
+        						<property name="minIdle" value="${db.minIdle}"/>
+        						<property name="initialSize" value="${db.initialSize}"/>
+       </bean>
+       <!-- 配置session -->
+       <bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+                  <property name="dataSource" ref="dataSource"/>
+		          <property name="hibernateProperties">
+					<props>
+						<prop key="hibernate.dialect">${hibernate.dialect}</prop>
+						<prop key="hibernate.show_sql">${hibernate.show_sql}</prop>
+						<prop key="hibernate.format_sql">${hibernate.format_sql}</prop>
+						<prop key="hibernate.hbm2ddl.auto">${hibernate.hbm2ddl.auto}</prop>
+		
+						<!-- 开启二级缓存 ehcache -->
+						<prop key="hibernate.cache.use_second_level_cache">${hibernate.cache.use_second_level_cache}</prop>
+						<prop key="hibernate.cache.use_query_cache">${hibernate.cache.use_query_cache}</prop>
+						<prop key="hibernate.cache.region.factory_class">${hibernate.cache.region.factory_class}</prop>
+						<prop key="hibernate.cache.provider_class">${hibernate.cache.provider_class}</prop>
+						<prop key="hibernate.cache.provider_configuration_file_resource_path">${hibernate.cache.provider_configuration_file_resource_path}
+						</prop>
+					</props>
+					</property>
+					<!-- 扫描hibernate注解配置的entity -->
+		            <property name="packagesToScan" value="com.wsbg.entity" />
+       </bean>
+		<!-- JDBCTemplate -->
+		<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate" >
+			<property name="dataSource" ref="dataSource" />
+		</bean>
+	<!-- 配置事物 -->
+       <bean id="transactionManager" class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+                   <property name="sessionFactory" ref="sessionFactory"></property>
+       </bean>
+      	<!-- 注解事务 -->
+       <tx:annotation-driven  transaction-manager="transactionManager"/>
+      <!-- 配置事务增强处理Bean，指定事务管理器 -->
+		<tx:advice id="transactionAdvice" transaction-manager="transactionManager">
+			<!-- 配置详细事务处理语义 -->
+			<tx:attributes>
+				<tx:method name="insert*" propagation="REQUIRED" />
+				<tx:method name="add*" propagation="REQUIRED" />
+				<tx:method name="save*" propagation="REQUIRED" />
+				<tx:method name="update*" propagation="REQUIRED" />
+				<tx:method name="delete*" propagation="REQUIRED" />
+				<tx:method name="modify*" propagation="REQUIRED" />
+	            
+	            <!--查询获取数据的 -->
+				<tx:method name="get*" propagation="SUPPORTS" read-only="true" />
+				<tx:method name="find*" propagation="SUPPORTS" read-only="true" />
+				<tx:method name="select*" propagation="SUPPORTS" read-only="true" />
+				<tx:method name="load*" propagation="SUPPORTS" read-only="true" />
+	
+				<!-- 其他采用默认事务方式 -->
+				<tx:method name="*" />
+			</tx:attributes>
+		</tx:advice>
+
+		<!-- Spring aop事务管理 -->
+		<aop:config>
+			<!-- 配置切入点 -->
+			<aop:pointcut id="transactionPointcut"
+				expression="execution(* com.wsbg.service.*.*(..))" />
+			<!-- 指定在txAdvice切入点应用txAdvice事务增强处理 -->
+			<aop:advisor pointcut-ref="transactionPointcut"
+				                     advice-ref="transactionAdvice" />
+		</aop:config>
+</beans>
